@@ -1,0 +1,5 @@
+# Lambda dependencies
+# boto3 is included in Lambda runtime, no need to package it
+# But for local testing, you might want it installed
+
+boto3>=1.26.0

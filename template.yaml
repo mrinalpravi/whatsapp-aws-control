@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: WhatsApp EC2 Control Bot - Manage EC2 instances via WhatsApp
+
+Parameters:
+  TwilioAccountSid:
+    Type: String
+    Description: Your Twilio Account SID
+    NoEcho: true
+
+  TwilioAuthToken:
+    Type: String
+    Description: Your Twilio Auth Token
+    NoEcho: true
+
+  AllowedPhoneNumbers:
+    Type: String
+    Description: Comma-separated list of allowed phone numbers (e.g., +1234567890,+0987654321)
+    Default: ''
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.11
+
+Resources:
+  # Secrets Manager secret for Twilio credentials
+  TwilioSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: whatsapp-ec2-control/twilio
+      Description: Twilio credentials for WhatsApp EC2 Control Bot
+      SecretString: !Sub |
+        {
+          "TWILIO_ACCOUNT_SID": "${TwilioAccountSid}",
+          "TWILIO_AUTH_TOKEN": "${TwilioAuthToken}",
+          "ALLOWED_PHONE_NUMBERS": "${AllowedPhoneNumbers}"
+        }
+
+  # Lambda execution role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: WhatsAppEC2ControlLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: EC2ControlPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: DescribeEC2Instances
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeTags
+                Resource: '*'
+              - Sid: ControlDevEnvironmentInstances
+                Effect: Allow
+                Action:
+                  - ec2:StartInstances
+                  - ec2:StopInstances
+                Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
+                Condition:
+                  StringEquals:
+                    'aws:ResourceTag/Environment': 'Dev'
+              - Sid: ControlAutoStopInstances
+                Effect: Allow
+                Action:
+                  - ec2:StartInstances
+                  - ec2:StopInstances
+                Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
+                Condition:
+                  StringEquals:
+                    'aws:ResourceTag/AutoStop': 'True'
+              - Sid: ReadSecretsManager
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref TwilioSecret
+
+  # Lambda function
+  WhatsAppEC2ControlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: whatsapp-ec2-control
+      CodeUri: lambda/
+      Handler: handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          WEBHOOK_URL: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/webhook'
+      Events:
+        Webhook:
+          Type: HttpApi
+          Properties:
+            Path: /webhook
+            Method: POST
+
+Outputs:
+  WebhookUrl:
+    Description: Webhook URL to configure in Twilio
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/webhook'
+
+  LambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt WhatsAppEC2ControlFunction.Arn
+
+  ApiEndpoint:
+    Description: API Gateway endpoint
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com'

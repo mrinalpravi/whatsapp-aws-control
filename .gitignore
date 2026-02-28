@@ -1,0 +1,27 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.env
+venv/
+ENV/
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# Testing
+test-event.json
+response.json
+
+# OS
+.DS_Store
+Thumbs.db
