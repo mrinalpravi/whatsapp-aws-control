@@ -166,10 +166,10 @@ def get_help():
     """Return help message with available commands."""
     return """*Available Commands:*
 
-*stop dev* - Stop all Dev environment instances
+*shutdown dev* - Stop all Dev environment instances
 *start dev* - Start all Dev environment instances
 
-*stop auto* - Stop all AutoStop instances
+*shutdown auto* - Stop all AutoStop instances
 *start auto* - Start all AutoStop instances
 
 *status* - Show all controllable instances
@@ -187,13 +187,13 @@ def process_command(message):
     if command == 'status':
         return get_status()
 
-    if command == 'stop dev':
+    if command == 'shutdown dev':
         return stop_instances_by_tag('Environment', 'Dev')
 
     if command == 'start dev':
         return start_instances_by_tag('Environment', 'Dev')
 
-    if command == 'stop auto':
+    if command == 'shutdown auto':
         return stop_instances_by_tag('AutoStop', 'True')
 
     if command == 'start auto':
